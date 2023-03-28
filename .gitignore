@@ -131,5 +131,5 @@ dmypy.json
 # GDrive
 *.ini
 
-
-Assignments/data
+# Data files excl
+Assignments/Assignment2/data
