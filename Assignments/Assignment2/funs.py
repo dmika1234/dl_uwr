@@ -131,6 +131,42 @@ class InMemDataLoader(object):
         return self
     
 
+def create_mnist_loaders(batch_size=128, data_path="./data", download=True):
+
+    transform = torchvision.transforms.Compose(
+        [
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Normalize((0.1307,), (0.3081,)),
+        ]
+    )
+
+    _test = torchvision.datasets.MNIST(
+        data_path, train=False, download=download, transform=transform
+    )
+
+    # Load training data, split into train and valid sets
+    _train = torchvision.datasets.MNIST(
+        data_path, train=True, download=download, transform=transform
+    )
+    _train.data = _train.data[:50000]
+    _train.targets = _train.targets[:50000]
+
+    _valid = torchvision.datasets.MNIST(
+        data_path, train=True, download=download, transform=transform
+    )
+    _valid.data = _valid.data[50000:]
+    _valid.targets = _valid.targets[50000:]
+
+    mnist_loaders = {
+        "train": InMemDataLoader(_train, batch_size=batch_size, shuffle=True),
+        "valid": InMemDataLoader(_valid, batch_size=batch_size, shuffle=False),
+        "test": InMemDataLoader(_test, batch_size=batch_size, shuffle=False),
+    }
+
+    return mnist_loaders
+
+
+##############################################################################################
 
 
 def SGD(
@@ -138,6 +174,7 @@ def SGD(
     data_loaders,
     alpha=1e-4,
     epsilon=0.0,
+    lr_schedule=(None, None),
     decay=0.0,
     num_epochs=1,
     max_num_epochs=np.nan,
@@ -146,7 +183,7 @@ def SGD(
     device="cpu",
     verbose=False
 ):
-
+    alpha0 = alpha
     # Put the model in train mode, and move to the evaluation device.
     model.train()
     model.to(device)
@@ -157,7 +194,6 @@ def SGD(
     #
     # TODO for Problem 1.3: Initialize momentum variables
     # Hint: You need one velocity matrix for each parameter
-    #
     velocities = [None for _ in model.parameters()]
     #
     iter_ = 0
@@ -178,7 +214,7 @@ def SGD(
             #
             # TODO: You can implement learning rate control here (it is updated
             # once per epoch), or below in the loop over minibatches.
-            #
+            alpha = lr_schedule(alpha0, epoch)
             
             for x, y in data_loaders["train"]:
                 x = x.to(device)
@@ -220,14 +256,17 @@ def SGD(
                         #
                         # TODO for Problem 1.1: Implement velocity updates for momentum
                         # lease make sure to modify the contents of v, not the v pointer!!!
-                        #
-                        # v[...] = TODO
+                        if v is None:
+                            param_grad = -alpha * p.grad
+                        else:
+                            param_grad = epsilon * v - alpha * p.grad
+                            v[...] = param_grad
 
                         #
                         # TODO for Problem 1: Set a more sensible learning rule here,
                         #       using your learning rate schedule and momentum
                         #
-                        p -= alpha * p.grad
+                        p += param_grad
 
                         # Zero gradients for the next iteration
                         p.grad.zero_()
@@ -277,9 +316,29 @@ class Model(nn.Module):
         super(Model, self).__init__()
         self.layers = nn.Sequential(*args, **kwargs)
 
+    def init_params_norm(self, mean=0, sd=0.5):
+        with torch.no_grad():
+            # Initialize parameters
+            for name, p in self.named_parameters():
+                if "weight" in name:
+                    p.normal_(mean, sd)
+                elif "bias" in name:
+                    p.zero_()
+                else:
+                    raise ValueError('Unknown parameter name "%s"' % name)
+
+
     def forward(self, X):
         X = X.view(X.size(0), -1)
         return self.layers.forward(X)
 
     def loss(self, Out, Targets):
         return F.cross_entropy(Out, Targets)
+
+
+# Rate schedule
+def exp_schedule(alpha0, iter, beta):
+    alpha = alpha0 * beta ** iter
+    return alpha
+
+

@@ -133,3 +133,9 @@ dmypy.json
 
 # Data files excl
 Assignments/Assignment2/data
+
+# VScode
+.vscode
+
+# PyCharm
+.idea
