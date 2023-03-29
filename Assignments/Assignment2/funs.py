@@ -1,7 +1,6 @@
 import os
 import time
 
-
 from IPython.display import clear_output
 from tqdm.auto import tqdm
 
@@ -12,7 +11,6 @@ import torch
 import torch.nn.functional as F
 import torchvision.datasets
 from torch import nn
-
 
 
 def compute_error_rate(model, data_loader, device="cpu"):
@@ -55,7 +53,6 @@ def plot_history(history):
     plt.legend()
 
 
-
 class InMemDataLoader(object):
     """
     A data loader that keeps all data in CPU or GPU memory.
@@ -64,13 +61,13 @@ class InMemDataLoader(object):
     __initialized = False
 
     def __init__(
-        self,
-        dataset,
-        batch_size=1,
-        shuffle=False,
-        sampler=None,
-        batch_sampler=None,
-        drop_last=False,
+            self,
+            dataset,
+            batch_size=1,
+            shuffle=False,
+            sampler=None,
+            batch_sampler=None,
+            drop_last=False,
     ):
         """A torch dataloader that fetches data from memory."""
         batches = []
@@ -129,10 +126,13 @@ class InMemDataLoader(object):
     def to(self, device):
         self.dataset.tensors = tuple(t.to(device) for t in self.dataset.tensors)
         return self
-    
+
+
+def l2_norm(w):
+    return (w ** 2).sum() / 2
+
 
 def create_mnist_loaders(batch_size=128, data_path="./data", download=True):
-
     transform = torchvision.transforms.Compose(
         [
             torchvision.transforms.ToTensor(),
@@ -170,20 +170,21 @@ def create_mnist_loaders(batch_size=128, data_path="./data", download=True):
 
 
 def SGD(
-    model,
-    data_loaders,
-    alpha=1e-4,
-    epsilon=0.0,
-    lr_schedule=(None, None),
-    decay=0.0,
-    num_epochs=1,
-    max_num_epochs=np.nan,
-    patience_expansion=1.5,
-    log_every=100,
-    device="cpu",
-    verbose=False
+        model,
+        data_loaders,
+        alpha=1e-4,
+        epsilon=0.0,
+        lr_schedule=(None, None),
+        decay=0.0,
+        num_epochs=1,
+        max_num_epochs=np.nan,
+        patience_expansion=1.5,
+        log_every=100,
+        device="cpu",
+        verbose=False
 ):
     alpha0 = alpha
+    lr_schedule, lr_schedule_type = lr_schedule
     # Put the model in train mode, and move to the evaluation device.
     model.train()
     model.to(device)
@@ -214,8 +215,9 @@ def SGD(
             #
             # TODO: You can implement learning rate control here (it is updated
             # once per epoch), or below in the loop over minibatches.
-            alpha = lr_schedule(alpha0, epoch)
-            
+            if lr_schedule_type == "epochs":
+                alpha = lr_schedule(alpha0, epoch)
+
             for x, y in data_loaders["train"]:
                 x = x.to(device)
                 y = y.to(device)
@@ -238,15 +240,14 @@ def SGD(
                             #
                             # TODO for Problem 1.3: Implement weight decay (L2 regularization
                             # on weights by changing the gradients
-                            # p.grad += TODO
-                            #
                             pass
+
 
                         #
                         # TODO for Problem 1.2: Implement a learning rate schedule
                         # Hint: You can use the iteration or epoch counters
-                        # alpha = TODO
-                        #
+                        if lr_schedule_type == "batch_iters":
+                            alpha = lr_schedule(alpha0, iter_)
 
                         #
                         # TODO for Problem 1.1: If needed, implement here a momentum schedule
@@ -308,8 +309,7 @@ def SGD(
             for param, best_param in zip(model.parameters(), best_params):
                 param[...] = best_param
     plot_history(history)
-
-
+    return val_err_rate
 
 class Model(nn.Module):
     def __init__(self, *args, **kwargs):
@@ -326,7 +326,27 @@ class Model(nn.Module):
                     p.zero_()
                 else:
                     raise ValueError('Unknown parameter name "%s"' % name)
-
+                
+    # def init_params_xavier(self, gain=1):
+    #     with torch.no_grad():
+    #         # Initialize parameters
+    #         for name, p in self.named_parameters():
+    #             if "weight" in name:
+    #                 fan_in, fan_out = nn.init._calculate_fan_in_and_fan_out(p)
+    #                 std = gain * np.sqrt(2.0 / (fan_in + fan_out))
+    #                 a = np.sqrt(3.0) * std
+    #                 nn.init.uniform_(p, -a, a)
+    #             elif "bias" in name:
+    #                 nn.init.zeros_(p)
+    
+    def init_params_xavier(self, gain=np.sqrt(2)):
+        with torch.no_grad():
+            # Initialize parameters
+            for name, p in self.named_parameters():
+                if "weight" in name:
+                    nn.init.xavier_uniform_(p, gain=gain)
+                elif "bias" in name:
+                    nn.init.zeros_(p)
 
     def forward(self, X):
         X = X.view(X.size(0), -1)
@@ -337,8 +357,17 @@ class Model(nn.Module):
 
 
 # Rate schedule
-def exp_schedule(alpha0, iter, beta):
-    alpha = alpha0 * beta ** iter
+def exp_schedule(alpha0, iter, beta=0.9, warmups=5):
+    if iter <= warmups:
+        alpha = iter * alpha0
+    elif iter > warmups:
+        alpha = alpha0 * beta ** (iter - warmups)
     return alpha
 
 
+def batch_schedule(alpha0, iter, threshold=10000):
+    if iter > threshold:
+        alpha = alpha0 / 2
+    else: 
+        alpha = alpha0
+    return alpha
