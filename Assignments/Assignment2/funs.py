@@ -366,7 +366,7 @@ def div_schedule2(alpha0, iter, threshold=10):
 # Misc
 def check_if_best(val_err, best_val_err, alpha, epsilon, decay, max_num_epochs, lr_schedule, hidden_neurons, gain):
   if val_err <= best_val_err:
-    msg = f"| Old best validations set error bitten!| Old error: {best_val_err * 100.0:.3f}% | New best error:  {val_err * 100.0:.3f}% | Saving hyperparameters!|"
+    msg = f"| Old best validation set error bitten!| Old error: {best_val_err * 100.0:.3f}% | New best error: {val_err * 100.0:.3f}% | Saving hyperparameters!|"
     print("{0}\n{1}\n{0}".format("-" * len(msg), msg))
     best_hypers = {'alpha': alpha, 'epsilon': epsilon, 'decay': decay, 'max_num_epochs': max_num_epochs,
                 'lr_schedule': lr_schedule, 'hidden_neurons': hidden_neurons, 'gain': gain}
