@@ -355,3 +355,9 @@ def div_schedule(alpha0, iter, threshold=10000):
     else: 
         alpha = alpha0
     return alpha
+
+
+def div_schedule2(alpha0, iter, threshold=10):
+  exp = np.floor(( iter - 12) / 12 + 1)
+  alpha = alpha0 / (2 ** exp)
+  return alpha
