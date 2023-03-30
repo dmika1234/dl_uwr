@@ -195,7 +195,7 @@ def SGD(
     #
     # TODO for Problem 1.3: Initialize momentum variables
     # Hint: You need one velocity matrix for each parameter
-    velocities = [None for _ in model.parameters()]
+    velocities = [torch.zeros_like(p) for p in model.parameters()]
     #
     iter_ = 0
     epoch = 0
@@ -257,17 +257,14 @@ def SGD(
                         #
                         # TODO for Problem 1.1: Implement velocity updates for momentum
                         # lease make sure to modify the contents of v, not the v pointer!!!
-                        if v is None:
-                            param_grad = -alpha * p.grad
-                        else:
-                            param_grad = epsilon * v - alpha * p.grad
-                            v[...] = param_grad
+                        param_grad = epsilon * v + (1-epsilon) * p.grad
+                        v[...] = param_grad
 
                         #
                         # TODO for Problem 1: Set a more sensible learning rule here,
                         #       using your learning rate schedule and momentum
                         #
-                        p += param_grad
+                        p += alpha * v
 
                         # Zero gradients for the next iteration
                         p.grad.zero_()
@@ -326,18 +323,6 @@ class Model(nn.Module):
                     p.zero_()
                 else:
                     raise ValueError('Unknown parameter name "%s"' % name)
-                
-    # def init_params_xavier(self, gain=1):
-    #     with torch.no_grad():
-    #         # Initialize parameters
-    #         for name, p in self.named_parameters():
-    #             if "weight" in name:
-    #                 fan_in, fan_out = nn.init._calculate_fan_in_and_fan_out(p)
-    #                 std = gain * np.sqrt(2.0 / (fan_in + fan_out))
-    #                 a = np.sqrt(3.0) * std
-    #                 nn.init.uniform_(p, -a, a)
-    #             elif "bias" in name:
-    #                 nn.init.zeros_(p)
     
     def init_params_xavier(self, gain=np.sqrt(2)):
         with torch.no_grad():
