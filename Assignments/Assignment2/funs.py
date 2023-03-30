@@ -365,7 +365,7 @@ def exp_schedule(alpha0, iter, beta=0.9, warmups=5):
     return alpha
 
 
-def batch_schedule(alpha0, iter, threshold=10000):
+def div_schedule(alpha0, iter, threshold=10000):
     if iter > threshold:
         alpha = alpha0 / 2
     else: 
