@@ -240,7 +240,7 @@ def SGD(
                             #
                             # TODO for Problem 1.3: Implement weight decay (L2 regularization
                             # on weights by changing the gradients
-                            pass
+                            p.grad += decay * p
 
 
                         #
