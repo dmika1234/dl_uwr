@@ -263,8 +263,7 @@ def SGD(
                         #
                         # TODO for Problem 1: Set a more sensible learning rule here,
                         #       using your learning rate schedule and momentum
-                        #
-                        p += alpha * v
+                        p -= alpha * v
 
                         # Zero gradients for the next iteration
                         p.grad.zero_()

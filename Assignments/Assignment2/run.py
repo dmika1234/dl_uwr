@@ -29,14 +29,14 @@ model.init_params_xavier()
 ############# 
 
 # On GPU enabled devices set device='cuda' else set device='cpu'
-# lr_schedule = (partial(exp_schedule, beta=0.9, warmups=6), "epochs")
+lr_schedule = (partial(exp_schedule, beta=0.9, warmups=6), "epochs")
 # lr_schedule = (div_schedule, "batch_iters")
-lr_schedule = (None, None)
+# lr_schedule = (None, None)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 t_start = time.time()
 val_err = SGD(model, mnist_loaders,
-    alpha=0.014, epsilon=0.9, lr_schedule=lr_schedule, decay=0.0,
+    alpha=0.1, epsilon=0.9, lr_schedule=lr_schedule, decay=0.0,
     max_num_epochs=30, device=device)
 ##
 test_err_rate = compute_error_rate(model, mnist_loaders["test"])
