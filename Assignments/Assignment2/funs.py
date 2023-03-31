@@ -371,3 +371,18 @@ def check_if_best(val_err, best_val_err, alpha, epsilon, decay, max_num_epochs, 
     best_hypers = {'alpha': alpha, 'epsilon': epsilon, 'decay': decay, 'max_num_epochs': max_num_epochs,
                 'lr_schedule': lr_schedule, 'hidden_neurons': hidden_neurons, 'gain': gain}
     return best_hypers
+
+
+
+class Dropout(torch.nn.Module):
+    def __init__(self, dropout_prob):
+        super(Dropout, self).__init__()
+        self.dropout_prob = dropout_prob
+
+    def forward(self, x):
+        if not self.training:
+            return x
+        mask = torch.rand(x.shape) > self.dropout_prob
+        mask = mask.float().to(x.device)
+        x = x * mask / (1 - self.dropout_prob)
+        return x
