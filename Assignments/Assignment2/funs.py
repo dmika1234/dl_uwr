@@ -391,6 +391,37 @@ class Dropout(torch.nn.Module):
         return x
 
 
+class BatchNorm(nn.Module):
+    def __init__(self, num_features, eps=1e-5, momentum=0.1):
+        super().__init__()
+        self.num_features = num_features
+        self.eps = eps
+        self.momentum = momentum
+        
+        self.gamma = nn.Parameter(torch.ones(num_features))
+        self.beta = nn.Parameter(torch.zeros(num_features))
+        self.register_buffer('running_mean', torch.zeros(num_features))
+        self.register_buffer('running_var', torch.ones(num_features))
+        
+    def forward(self, x):
+        if self.training:
+            # Compute the mean and variance along each channel
+            mean = x.mean(dim=0)
+            var = x.var(dim=0, unbiased=False)
+        
+            self.running_mean = (1 - self.momentum) * self.running_mean + self.momentum * mean
+            self.running_var = (1 - self.momentum) * self.running_var + self.momentum * var
+
+            x_hat = (x - mean) / torch.sqrt(var + self.eps)
+            y = self.gamma * x_hat + self.beta
+            
+        else:
+            x_hat = (x - self.running_mean) / torch.sqrt(self.running_var + self.eps)
+            y = self.gamma * x_hat + self.beta
+        
+        return y
+
+
 def train_model(model, mnist_loaders, alpha, epsilon, lr_schedule, decay, max_num_epochs, train_transform=None, device='cpu'):
     t_start = time.time()
     val_err = SGD(model, mnist_loaders, alpha=alpha, epsilon=epsilon, lr_schedule=lr_schedule,
@@ -401,3 +432,4 @@ def train_model(model, mnist_loaders, alpha, epsilon, lr_schedule, decay, max_nu
         f"training took {time.time() - t_start:.0f}s."
     )
     print("{0}\n{1}\n{0}".format("-" * len(m), m))
+    return val_err
