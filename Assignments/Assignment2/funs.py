@@ -178,6 +178,7 @@ def SGD(
         decay=0.0,
         num_epochs=1,
         max_num_epochs=np.nan,
+        train_transform=None,
         patience_expansion=1.5,
         log_every=100,
         device="cpu",
@@ -219,6 +220,8 @@ def SGD(
                 alpha = lr_schedule(alpha0, epoch)
 
             for x, y in data_loaders["train"]:
+                if train_transform:
+                    x = train_transform(x)
                 x = x.to(device)
                 y = y.to(device)
                 iter_ += 1
@@ -386,3 +389,15 @@ class Dropout(torch.nn.Module):
         mask = mask.float().to(x.device)
         x = x * mask / (1 - self.dropout_prob)
         return x
+
+
+def train_model(model, mnist_loaders, alpha, epsilon, lr_schedule, decay, max_num_epochs, train_transform=None, device='cpu'):
+    t_start = time.time()
+    val_err = SGD(model, mnist_loaders, alpha=alpha, epsilon=epsilon, lr_schedule=lr_schedule,
+                   decay=decay, max_num_epochs=max_num_epochs, train_transform=train_transform, device=device)
+    test_err_rate = compute_error_rate(model, mnist_loaders["test"])
+    m = (
+        f"Test error rate: {test_err_rate * 100.0:.3f}%, "
+        f"training took {time.time() - t_start:.0f}s."
+    )
+    print("{0}\n{1}\n{0}".format("-" * len(m), m))
