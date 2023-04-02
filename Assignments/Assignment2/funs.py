@@ -182,6 +182,7 @@ def SGD(
         max_num_epochs=np.nan,
         train_transform=None,
         norm_threshold=np.inf,
+        pruned=False,
         patience_expansion=1.5,
         log_every=100,
         device="cpu",
@@ -244,6 +245,10 @@ def SGD(
                 # backpropagate through the gradient application!
                 with torch.no_grad():
                     for (name, p), v in zip(model.named_parameters(), velocities):
+                        # Fro prunning
+                        if pruned:
+                            zero_mask = p == 0
+
                         if "weight" in name:
                             #
                             # TODO for Problem 1.3: Implement weight decay (L2 regularization
@@ -281,6 +286,8 @@ def SGD(
                             scaled_rows *= norm_threshold
                             p[mask] = scaled_rows
 
+                        if pruned:
+                            p *= zero_mask
                         # Zero gradients for the next iteration
                         p.grad.zero_()
 
@@ -439,11 +446,11 @@ class BatchNorm(nn.Module):
 
 
 def train_model(model, mnist_loaders, alpha, epsilon, lr_schedule, decay,
-                 max_num_epochs, train_transform=None, norm_threshold=np.inf, device='cpu'):
+                 max_num_epochs, train_transform=None, norm_threshold=np.inf, pruned=False, device='cpu'):
     t_start = time.time()
     val_err = SGD(model, mnist_loaders, alpha=alpha, epsilon=epsilon, lr_schedule=lr_schedule,
                    decay=decay, max_num_epochs=max_num_epochs, train_transform=train_transform,
-                     norm_threshold=norm_threshold, device=device)
+                     norm_threshold=norm_threshold, pruned=pruned, device=device)
     test_err_rate = compute_error_rate(model, mnist_loaders["test"])
     m = (
         f"Test error rate: {test_err_rate * 100.0:.3f}%, "
