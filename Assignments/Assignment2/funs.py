@@ -287,7 +287,7 @@ def SGD(
                             p[mask] = scaled_rows
 
                         if pruned:
-                            p *= zero_mask
+                            p *= zero_mask.float()
                         # Zero gradients for the next iteration
                         p.grad.zero_()
 
@@ -459,6 +459,7 @@ def train_model(model, mnist_loaders, alpha, epsilon, lr_schedule, decay,
     print("{0}\n{1}\n{0}".format("-" * len(m), m))
     return val_err
 
+
 def hyperparameter_tuner(hyperparams, max_epochs=30, num_trials=100, loaders=None, device='cpu'):
   # Initialize the best validation accuracy and hyperparameters
   best_val_err = 1
@@ -496,8 +497,37 @@ def prune_model(model, prune_perc):
         if isinstance(module, nn.Linear):
             with torch.no_grad():
                 qt = torch.quantile(torch.abs(module.weight.data), prune_perc)
-                mask = torch.abs(module.weight.data) >= qt
+                mask = torch.abs(module.weight.data) < qt
                 module.weight.data *= mask.float()
                 if module.bias is not None:
                     module.bias.data *= mask[:, 0].float()
     return pruned_model
+
+class ELM(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size):
+        super().__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.output_size = output_size
+        self.weights = torch.randn(input_size, hidden_size, requires_grad=False)
+        self.biases = torch.randn(hidden_size, requires_grad=False)
+        self.output_weights = torch.randn(hidden_size, output_size, requires_grad=False)
+        self.init_params_xavier()
+
+    def forward(self, x):
+        x = x.view(x.size(0), -1).float()
+        hidden = x @ self.weights + self.biases
+        output = hidden @ self.output_weights
+        return output
+    
+    def calculate_output_weights(self, x, y):
+        x = x.view(x.size(0), -1).float()
+        y = y.float()
+        hidden = x @ self.weights + self.biases
+        xtx = torch.matmul(hidden.t(), hidden)
+        self.output_weights[...] = (torch.inverse(xtx) @ hidden.t() @ y).view(self.hidden_size, self.output_size)
+
+    def init_params_xavier(self, gain=np.sqrt(2)):
+        with torch.no_grad():
+          nn.init.xavier_uniform_(self.weights, gain=gain)
+          nn.init.zeros_(self.biases)
