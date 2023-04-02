@@ -452,7 +452,7 @@ def train_model(model, mnist_loaders, alpha, epsilon, lr_schedule, decay,
     print("{0}\n{1}\n{0}".format("-" * len(m), m))
     return val_err
 
-def hyperparameter_tuner(hyperparams, max_epochs=30, num_trials=100, loaders=mnist_loaders, device='cpu'):
+def hyperparameter_tuner(hyperparams, max_epochs=30, num_trials=100, loaders=None, device='cpu'):
   # Initialize the best validation accuracy and hyperparameters
   best_val_err = 1
   best_hyperparams = None
