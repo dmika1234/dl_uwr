@@ -179,6 +179,7 @@ def SGD(
         num_epochs=1,
         max_num_epochs=np.nan,
         train_transform=None,
+        norm_threshold=np.inf,
         patience_expansion=1.5,
         log_every=100,
         device="cpu",
@@ -267,6 +268,14 @@ def SGD(
                         # TODO for Problem 1: Set a more sensible learning rule here,
                         #       using your learning rate schedule and momentum
                         p -= alpha * v
+
+                        # Norm Constraint:
+                        if "weight" in name:
+                            row_norms = torch.norm(p, p=2, dim=1)
+                            mask = row_norms >= norm_threshold
+                            scaled_rows = param.data[mask] / row_norms[mask, None]
+                            scaled_rows *= norm_threshold
+                            param.data[mask] = scaled_rows
 
                         # Zero gradients for the next iteration
                         p.grad.zero_()
@@ -422,10 +431,12 @@ class BatchNorm(nn.Module):
         return y
 
 
-def train_model(model, mnist_loaders, alpha, epsilon, lr_schedule, decay, max_num_epochs, train_transform=None, device='cpu'):
+def train_model(model, mnist_loaders, alpha, epsilon, lr_schedule, decay,
+                 max_num_epochs, train_transform=None, norm_threshold=np.inf, device='cpu'):
     t_start = time.time()
     val_err = SGD(model, mnist_loaders, alpha=alpha, epsilon=epsilon, lr_schedule=lr_schedule,
-                   decay=decay, max_num_epochs=max_num_epochs, train_transform=train_transform, device=device)
+                   decay=decay, max_num_epochs=max_num_epochs, train_transform=train_transform,
+                     norm_threshold=norm_threshold, device=device)
     test_err_rate = compute_error_rate(model, mnist_loaders["test"])
     m = (
         f"Test error rate: {test_err_rate * 100.0:.3f}%, "
