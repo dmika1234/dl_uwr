@@ -6,6 +6,8 @@ from tqdm.auto import tqdm
 
 import matplotlib.pyplot as plt
 import numpy as np
+import random
+import copy
 
 import torch
 import torch.nn.functional as F
@@ -315,11 +317,13 @@ def SGD(
         pass
 
     if best_params is not None:
-        print("\nLoading best params on validation set (epoch %d)\n" % (best_epoch))
+        if not full_silent:
+            print("\nLoading best params on validation set (epoch %d)\n" % (best_epoch))
         with torch.no_grad():
             for param, best_param in zip(model.parameters(), best_params):
                 param[...] = best_param
-    plot_history(history)
+    if not full_silent:            
+        plot_history(history)
     return val_err_rate
 
 class Model(nn.Module):
@@ -447,3 +451,46 @@ def train_model(model, mnist_loaders, alpha, epsilon, lr_schedule, decay,
     )
     print("{0}\n{1}\n{0}".format("-" * len(m), m))
     return val_err
+
+def hyperparameter_tuner(hyperparams, max_epochs=30, num_trials=100, loaders=mnist_loaders, device='cpu'):
+  # Initialize the best validation accuracy and hyperparameters
+  best_val_err = 1
+  best_hyperparams = None
+
+  # Perform random search
+  for i in tqdm(range(num_trials)):
+    # Randomly sample hyperparameters
+    hyperparam_sample = {k: random.choice(v) for k, v in hyperparams.items()}
+    
+    # Train the model with the sampled hyperparameters
+    model = Model(nn.Linear(28 * 28, hyperparam_sample['num_neurons']),
+            nn.ReLU(),
+            nn.Linear(hyperparam_sample['num_neurons'], hyperparam_sample['num_neurons']),
+            nn.ReLU(),
+            nn.Linear(hyperparam_sample['num_neurons'], 10))
+    model.init_params_xavier(gain=hyperparam_sample['gain'])
+    val_err = SGD(model, loaders, alpha=hyperparam_sample['lr'], epsilon=hyperparam_sample['momentum'], lr_schedule=hyperparam_sample['lr_schedule'],
+                  decay=hyperparam_sample['decay'], max_num_epochs=max_epochs,
+                    norm_threshold=hyperparam_sample['norm_threshold'], device=device, full_silent=True)
+
+      
+      # Record the hyperparameters if they gave the best validation accuracy so far
+    if val_err < best_val_err:
+        best_val_err = val_err
+        best_hyperparams = hyperparam_sample
+    
+    print(f'Trial {i+1} obtained: val_err={100 * val_err:.2f}%, best_val_err={100 * best_val_err:.f}%')
+  return best_val_err, best_hyperparams
+
+
+def prune_model(model, prune_perc):
+    pruned_model = copy.deepcopy(model)
+    for name, module in pruned_model.named_modules():
+        if isinstance(module, nn.Linear):
+            with torch.no_grad():
+                qt = torch.quantile(torch.abs(module.weight.data), prune_perc)
+                mask = torch.abs(module.weight.data) >= qt
+                module.weight.data *= mask.float()
+                if module.bias is not None:
+                    module.bias.data *= mask[:, 0].float()
+    return pruned_model
