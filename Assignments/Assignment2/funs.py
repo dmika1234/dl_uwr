@@ -273,9 +273,9 @@ def SGD(
                         if "weight" in name:
                             row_norms = torch.norm(p, p=2, dim=1)
                             mask = row_norms >= norm_threshold
-                            scaled_rows = param.data[mask] / row_norms[mask, None]
+                            scaled_rows = p[mask] / row_norms[mask, None]
                             scaled_rows *= norm_threshold
-                            param.data[mask] = scaled_rows
+                            p[mask] = scaled_rows
 
                         # Zero gradients for the next iteration
                         p.grad.zero_()
@@ -361,7 +361,7 @@ def exp_schedule(alpha0, iter, beta=0.9, warmups=5):
     return alpha
 
 
-def div_schedule(alpha0, iter, threshold=10000):
+def div_schedule(alpha0, iter, threshold=10):
     if iter > threshold:
         alpha = alpha0 / 2
     else: 
@@ -370,7 +370,7 @@ def div_schedule(alpha0, iter, threshold=10000):
 
 
 def div_schedule2(alpha0, iter, threshold=10):
-  exp = np.floor(( iter - 12) / 12 + 1)
+  exp = np.floor(( iter - threshold) / threshold + 1)
   alpha = alpha0 / (2 ** exp)
   return alpha
 
