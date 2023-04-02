@@ -183,7 +183,8 @@ def SGD(
         patience_expansion=1.5,
         log_every=100,
         device="cpu",
-        verbose=False
+        verbose=False,
+        full_silent=False
 ):
     alpha0 = alpha
     lr_schedule, lr_schedule_type = lr_schedule
@@ -204,8 +205,9 @@ def SGD(
     best_params = None
     best_val_err = np.inf
     history = {"train_losses": [], "train_errs": [], "val_errs": []}
-    print("Training the model!")
-    print("Interrupt at any time to evaluate the best validation model so far.")
+    if not full_silent:
+        print("Training the model!")
+        print("Interrupt at any time to evaluate the best validation model so far.")
     try:
         tstart = time.time()
         siter = iter_
@@ -306,7 +308,8 @@ def SGD(
             m = "After epoch {0: >2} | valid err rate: {1: >5.2f}% | doing {2: >3} epochs".format(
                 epoch, val_err_rate * 100.0, num_epochs
             )
-            print("{0}\n{1}\n{0}".format("-" * len(m), m))
+            if not full_silent:
+                print("{0}\n{1}\n{0}".format("-" * len(m), m))
 
     except KeyboardInterrupt:
         pass
