@@ -487,7 +487,7 @@ def hyperparameter_tuner(hyperparams, max_epochs=30, num_trials=100, loaders=Non
         best_val_err = val_err
         best_hyperparams = hyperparam_sample
     
-    print(f'Trial {i+1} obtained: val_err={100 * val_err:.2f}%, best_val_err={100 * best_val_err:.f}%')
+    print(f'Trial {i+1} obtained: val_err={100 * val_err:.2f}%, best_val_err={100 * best_val_err:.2f}%')
   return best_val_err, best_hyperparams
 
 
