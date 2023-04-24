@@ -279,7 +279,7 @@ def SGD(
                         p -= alpha * v
 
                         # Norm Constraint:
-                        if "weight" in name:
+                        if ("weight" in name) and norm_threshold:
                             row_norms = torch.norm(p, p=2, dim=1)
                             mask = row_norms >= norm_threshold
                             scaled_rows = p[mask] / row_norms[mask, None]
@@ -446,7 +446,7 @@ class BatchNorm(nn.Module):
 
 
 def train_model(model, mnist_loaders, alpha, epsilon, lr_schedule, decay,
-                 max_num_epochs, train_transform=None, norm_threshold=np.inf, pruned=False, device='cpu'):
+                 max_num_epochs, train_transform=None, norm_threshold=None, pruned=False, device='cpu'):
     t_start = time.time()
     val_err = SGD(model, mnist_loaders, alpha=alpha, epsilon=epsilon, lr_schedule=lr_schedule,
                    decay=decay, max_num_epochs=max_num_epochs, train_transform=train_transform,
