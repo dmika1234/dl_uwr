@@ -161,7 +161,7 @@ class VGG(torch.nn.Module):
     def probabilities(self, x):
         """Return class probabilities.
         """
-        logits = self(x)
+        logits = self.forward(x)
         return self.softmax(logits)
 
     def layer_activations(self, x, layer_name):
@@ -179,12 +179,12 @@ class VGG(torch.nn.Module):
         """
         pass # TODO implement me
 
-    def predict(self, x):
+    def predict(self, x, k=1):
         """Return predicted class IDs.
         """
         probabilities = self.probabilities(x)
-        _, prediction = torch.max(probabilities, dim=1)
-        return prediction
+        top_prob, top_pred = torch.topk(probabilities, k=k)
+        return top_pred
 
 
 class ILSVRC2014Sample(object):
