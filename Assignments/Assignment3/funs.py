@@ -14,8 +14,43 @@ import torch.nn.functional as F
 import torchvision
 from torch import nn
 from torch.autograd import Variable
+import torch.utils.data as data
+
 
 CUDA = True
+
+
+def generate_heatmap(vgg, img, x_dim, y_dim, layer_name, map_index):
+    heatmap = np.zeros((x_dim[1] - x_dim[0], y_dim[1] - y_dim[0]))
+    occlusion_iter = OcclusionIterator(img, x_dim=x_dim, y_dim=y_dim, occlusion_size=1)
+    occlusion_iter_obj = iter(occlusion_iter)
+    for i in range(y_dim[1] - y_dim[0]):
+        for j in range(x_dim[1] - x_dim[0]):
+            occluded_img = to_tensor(next(occlusion_iter_obj))
+            occluded_activation = vgg.layer_activations(occluded_img, layer_name)
+            heatmap[i, j] += to_np(occluded_activation[0, map_index].sum())
+    heatmap /= heatmap.max()
+    return heatmap
+
+
+class OcclusionIterator(data.IterableDataset):
+    def __init__(self, img, x_dim=(0,0), y_dim=(0,0), occlusion_size=1, occlusion_step=1):
+        super().__init__()
+        self.img = img
+        self.start_x, self.end_x = x_dim
+        self.start_y, self.end_y = y_dim
+        self.occlusion_size = occlusion_size
+        self.occlusion_step = occlusion_step
+        self.height, self.width = img.shape[0:2]
+        self.end_x = np.minimum(self.width, self.end_x)
+        self.end_y = np.minimum(self.height, self.end_y)
+        
+    def __iter__(self):
+      for y in range(self.start_y, self.end_y, self.occlusion_step):
+        for x in range(self.start_x, self.end_x, self.occlusion_step):
+          img_copy = np.copy(self.img)
+          img_copy[y:(y+self.occlusion_size), x:(x+self.occlusion_size):,  :] = 0
+          yield img_copy
 
 
 class VGGPreprocess(torch.nn.Module):
