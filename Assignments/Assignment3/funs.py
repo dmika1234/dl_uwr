@@ -17,8 +17,6 @@ from torch.autograd import Variable
 import torch.utils.data as data
 
 
-CUDA = True
-
 
 def generate_prob_heatmaps(vgg, img, id, x_dim, y_dim):
   heatmap = np.zeros((x_dim[1] - x_dim[0], y_dim[1] - y_dim[0]))
