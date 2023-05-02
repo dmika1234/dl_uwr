@@ -51,7 +51,7 @@ def generate_heatmap(vgg, img, x_dim, y_dim, layer_name, map_index):
 
 
 class OcclusionIterator(data.IterableDataset):
-    def __init__(self, img, x_dim=(0,0), y_dim=(0,0), occlusion_size=1, occlusion_step=1):
+    def __init__(self, img, x_dim=(0,0), y_dim=(0,0), occlusion_size=1, occlusion_step=1, gray_value=128):
         super().__init__()
         self.img = img
         self.start_x, self.end_x = x_dim
@@ -61,12 +61,13 @@ class OcclusionIterator(data.IterableDataset):
         self.height, self.width = img.shape[0:2]
         self.end_x = np.minimum(self.width, self.end_x)
         self.end_y = np.minimum(self.height, self.end_y)
+        self.gray_value = gray_value
         
     def __iter__(self):
       for y in range(self.start_y, self.end_y, self.occlusion_step):
         for x in range(self.start_x, self.end_x, self.occlusion_step):
           img_copy = np.copy(self.img)
-          img_copy[y:(y+self.occlusion_size), x:(x+self.occlusion_size):,  :] = 0
+          img_copy[y:(y+self.occlusion_size), x:(x+self.occlusion_size):,  :] = self.gray_value
           yield img_copy
 
 
