@@ -54,7 +54,7 @@ def obscured_imgs(img, boxsize=8, bsz=64, stride=4, gray_value=0.51):
           i += 1
           if i >= k*bsz:
             k += 1
-            yield batch[(k-2)*bsz:(k-1)*bsz], k
+            yield batch[(k-2)*bsz:(k-1)*bsz]
 
 
 def generate_prob_heatmaps(vgg, img, id, x_dim, y_dim, gray_value=0.255, cuda=False):
