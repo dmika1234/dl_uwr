@@ -20,6 +20,23 @@ import torch.utils.data as data
 CUDA = True
 
 
+def generate_prob_heatmaps(vgg, img, id, x_dim, y_dim):
+  heatmap = np.zeros((x_dim[1] - x_dim[0], y_dim[1] - y_dim[0]))
+  arg_prob_heatmap = np.zeros((x_dim[1] - x_dim[0], y_dim[1] - y_dim[0]))
+  occlusion_iter = OcclusionIterator(img, x_dim=x_dim, y_dim=y_dim, occlusion_size=1)
+  occlusion_iter_obj = iter(occlusion_iter)
+  for i in range(y_dim[1] - y_dim[0]):
+      for j in range(x_dim[1] - x_dim[0]):
+          occluded_img = to_tensor(next(occlusion_iter_obj))
+          probs = to_np(vgg.probabilities(occluded_img))[0]
+          heatmap[i, j] += probs[id]
+          arg_prob_heatmap[i, j] += np.argmax(probs)
+          # print(np.argmax(probs))
+  heatmap /= heatmap.max()
+  arg_prob_heatmap /= arg_prob_heatmap.max()
+  return heatmap, arg_prob_heatmap
+
+
 def generate_heatmap(vgg, img, x_dim, y_dim, layer_name, map_index):
     heatmap = np.zeros((x_dim[1] - x_dim[0], y_dim[1] - y_dim[0]))
     occlusion_iter = OcclusionIterator(img, x_dim=x_dim, y_dim=y_dim, occlusion_size=1)
