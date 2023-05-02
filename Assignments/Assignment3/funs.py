@@ -17,14 +17,14 @@ from torch.autograd import Variable
 import torch.utils.data as data
 
 
-def generate_prob_heatmaps(vgg, img, id, x_dim, y_dim):
+def generate_prob_heatmaps(vgg, img, id, x_dim, y_dim, cuda=False):
   heatmap = np.zeros((x_dim[1] - x_dim[0], y_dim[1] - y_dim[0]))
   arg_prob_heatmap = np.zeros((x_dim[1] - x_dim[0], y_dim[1] - y_dim[0]))
   occlusion_iter = OcclusionIterator(img, x_dim=x_dim, y_dim=y_dim, occlusion_size=1)
   occlusion_iter_obj = iter(occlusion_iter)
   for i in range(y_dim[1] - y_dim[0]):
       for j in range(x_dim[1] - x_dim[0]):
-          occluded_img = to_tensor(next(occlusion_iter_obj))
+          occluded_img = to_tensor(next(occlusion_iter_obj), cuda)
           probs = to_np(vgg.probabilities(occluded_img))[0]
           heatmap[i, j] += probs[id]
           arg_prob_heatmap[i, j] += np.argmax(probs)
@@ -34,13 +34,13 @@ def generate_prob_heatmaps(vgg, img, id, x_dim, y_dim):
   return heatmap, arg_prob_heatmap
 
 
-def generate_heatmap(vgg, img, x_dim, y_dim, layer_name, map_index):
+def generate_heatmap(vgg, img, x_dim, y_dim, layer_name, map_index, cuda=False):
     heatmap = np.zeros((x_dim[1] - x_dim[0], y_dim[1] - y_dim[0]))
     occlusion_iter = OcclusionIterator(img, x_dim=x_dim, y_dim=y_dim, occlusion_size=1)
     occlusion_iter_obj = iter(occlusion_iter)
     for i in range(y_dim[1] - y_dim[0]):
         for j in range(x_dim[1] - x_dim[0]):
-            occluded_img = to_tensor(next(occlusion_iter_obj))
+            occluded_img = to_tensor(next(occlusion_iter_obj), cuda)
             occluded_activation = vgg.layer_activations(occluded_img, layer_name)
             heatmap[i, j] += to_np(occluded_activation[0, map_index].sum())
     heatmap /= heatmap.max()
@@ -294,9 +294,9 @@ def to_np(x):
     return x.detach().cpu().numpy()
 
 
-def to_tensor(x, requires_grad=False):
+def to_tensor(x, requires_grad=False, cuda=False):
     x = torch.from_numpy(x)
-    if CUDA:
+    if cuda:
         x = x.cuda()
     # return torch.tensor(x, **kwargs)
     if requires_grad:
