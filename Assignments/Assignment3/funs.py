@@ -32,29 +32,18 @@ def discrete_cmap(N, base_cmap=None):
     return base.from_list(cmap_name, color_list, N)
 
 
-def obscured_imgs(img, boxsize=8, bsz=64, stride=4, gray_value=0.51):
-    """Generator of batches with partial obstructions"""
+def obscured_imgs(img, boxsize=8, bsz=64, stride=4, grey_val = 0.51):
     h, w, _ = img.shape
-    batch = []
-    k = 1
-    i = 0
-    while True:
-      for y in range(0, h, stride):
-        for x in range(0, w, stride):
-          img_copy = np.copy(img)
-          if (x + boxsize <= w) and (y + boxsize <= h):
-            img_copy[y:(y+boxsize), x:(x+boxsize):, :] = gray_value
-          elif x + boxsize > w:
-            img_copy[y:(y+boxsize), w-boxsize:w, :] = gray_value
-            continue
-          elif y + boxsize > h:
-            img_copy[h-boxsize:h, x:(x+boxsize), :] = gray_value
-            continue
-          batch.append(img_copy)
-          i += 1
-          if i >= k*bsz:
-            k += 1
-            yield batch[(k-2)*bsz:(k-1)*bsz]
+    batches = []
+
+    for i in range(0, h - boxsize, stride):
+      for j in range(0, w - boxsize, stride):
+        img_cp = img.copy()
+        img_cp[i:i+boxsize, j:j+boxsize, :] = grey_val
+        batches.append(img_cp)
+    
+    for i in range(0, len(batches), bsz):
+        yield np.array(batches[i: min(i + bsz, len(batches))])
 
 
 def generate_prob_heatmaps(vgg, img, id, x_dim, y_dim, gray_value=0.255, cuda=False):
