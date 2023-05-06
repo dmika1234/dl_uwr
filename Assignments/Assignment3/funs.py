@@ -18,24 +18,6 @@ from torch.autograd import Variable
 import torch.utils.data as data
 
 
-# Train only the classifier!
-def compute_error_rate(model, data_loader, cuda=True):
-    model.eval()
-    num_errs = 0.0
-    num_examples = 0
-    for x, y in data_loader:
-        if cuda:
-            x = x.cuda()
-            y = y.cuda()
-
-        with torch.no_grad():
-            outputs = model.forward(x)
-            _, predictions = outputs.max(dim=1)
-            num_errs += (predictions != y).sum().item()
-            num_examples += x.size(0)
-    return 100.0 * num_errs / num_examples
-
-
 def train(
     model, data_loaders, optimizer, criterion, num_epochs=1, log_every=100, cuda=True
 ):
@@ -99,6 +81,24 @@ def train(
         print("\nLoading best params on validation set (epoch %d)\n" % (best_epoch))
         model.parameters = best_params
     plot_history(history)
+
+
+# Train only the classifier!
+def compute_error_rate(model, data_loader, cuda=True):
+    model.eval()
+    num_errs = 0.0
+    num_examples = 0
+    for x, y in data_loader:
+        if cuda:
+            x = x.cuda()
+            y = y.cuda()
+
+        with torch.no_grad():
+            outputs = model.forward(x)
+            _, predictions = outputs.max(dim=1)
+            num_errs += (predictions != y).sum().item()
+            num_examples += x.size(0)
+    return 100.0 * num_errs / num_examples
 
 
 def plot_history(history):
