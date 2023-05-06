@@ -18,6 +18,120 @@ from torch.autograd import Variable
 import torch.utils.data as data
 
 
+# Train only the classifier!
+def compute_error_rate(model, data_loader, cuda=True):
+    model.eval()
+    num_errs = 0.0
+    num_examples = 0
+    for x, y in data_loader:
+        if cuda:
+            x = x.cuda()
+            y = y.cuda()
+
+        with torch.no_grad():
+            outputs = model.forward(x)
+            _, predictions = outputs.max(dim=1)
+            num_errs += (predictions != y).sum().item()
+            num_examples += x.size(0)
+    return 100.0 * num_errs / num_examples
+
+
+def train(
+    model, data_loaders, optimizer, criterion, num_epochs=1, log_every=100, cuda=True
+):
+    if cuda:
+        model.cuda()
+
+    iter_ = 0
+    epoch = 0
+    best_params = None
+    best_val_err = np.inf
+    history = {"train_losses": [], "train_errs": [], "val_errs": []}
+    print("Training the model!")
+    print("You can interrupt it at any time.")
+    try:
+        while epoch < num_epochs:
+            model.train()
+            # model.train_mode()
+            epoch += 1
+            for x, y in data_loaders["train"]:
+                if cuda:
+                    x = x.cuda()
+                    y = y.cuda()
+                iter_ += 1
+
+                optimizer.zero_grad()
+                out = model.forward(x)
+                loss = criterion(out, y)
+                loss.backward()
+                optimizer.step()
+                _, predictions = out.max(dim=1)
+                err_rate = 100.0 * (predictions != y).sum() / out.size(0)
+
+                history["train_losses"].append(loss.item())
+                history["train_errs"].append(err_rate.item())
+
+                                
+                if iter_ % log_every == 0:
+                    print(
+                        "Minibatch {0: >6}  | loss {1: >5.2f} | err rate {2: >5.2f}%".format(
+                            iter_, loss.item(), err_rate
+                        )
+                    )
+
+            val_err_rate = compute_error_rate(model, data_loaders["test"], cuda)
+            history["val_errs"].append((iter_, val_err_rate))
+
+            if val_err_rate < best_val_err:
+
+                                
+                best_epoch = epoch
+                best_val_err = val_err_rate
+
+                
+            m = "After epoch {0: >2} | valid err rate: {1: >5.2f}% | doing {2: >3} epochs".format(
+                epoch, val_err_rate, num_epochs
+            )
+            print("{0}\n{1}\n{0}".format("-" * len(m), m))
+    except KeyboardInterrupt:
+        pass
+    if best_params is not None:
+        print("\nLoading best params on validation set (epoch %d)\n" % (best_epoch))
+        model.parameters = best_params
+    plot_history(history)
+
+
+def plot_history(history):
+    plt.figsize(16, 4)
+    plt.subplot(1, 2, 1)
+    train_loss = np.array(history["train_losses"])
+    plt.semilogy(np.arange(train_loss.shape[0]), train_loss, label="batch train loss")
+    plt.legend()
+
+    plt.subplot(1, 2, 2)
+    train_errs = np.array(history["train_errs"])
+    plt.plot(np.arange(train_errs.shape[0]), train_errs, label="batch train error rate")
+    val_errs = np.array(history["val_errs"])
+    plt.plot(val_errs[:, 0], val_errs[:, 1], label="validation error rate", color="r")
+    plt.ylim(0, 20)
+    plt.legend()
+
+
+class SubsampledImageDataset(torch.utils.data.Dataset):
+    def __init__(self, dataset, indexes, transform, **kwargs):
+        super(SubsampledImageDataset, self).__init__(**kwargs)
+        self.dataset = dataset
+        self.indexes = indexes
+        self.transform = transform
+
+    def __getitem__(self, i):
+        img, label = self.dataset[self.indexes[i]]
+        img = self.transform(img)
+        return img, label
+
+    def __len__(self):
+        return len(self.indexes)
+
 
 def discrete_cmap(N, base_cmap=None):
     """Create an N-bin discrete colormap from the specified input map"""
