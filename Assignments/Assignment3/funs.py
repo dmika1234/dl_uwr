@@ -104,7 +104,7 @@ def compute_error_rate(model, data_loader, cuda=True):
 
 
 def plot_history(history):
-    figsize(16, 4)
+    # figsize(16, 4)
     plt.subplot(1, 2, 1)
     train_loss = np.array(history["train_losses"])
     plt.semilogy(np.arange(train_loss.shape[0]), train_loss, label="batch train loss")
