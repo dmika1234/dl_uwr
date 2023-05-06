@@ -19,7 +19,7 @@ import torch.utils.data as data
 
 
 def train(
-    model, data_loaders, optimizer, criterion, num_epochs=1, log_every=100, cuda=True
+    model, data_loaders, optimizer, criterion, train_transform=None, num_epochs=1, log_every=100, cuda=True
 ):
     if cuda:
         model.cuda()
@@ -37,6 +37,8 @@ def train(
             # model.train_mode()
             epoch += 1
             for x, y in data_loaders["train"]:
+                if train_transform:
+                    x = train_transform(x)
                 if cuda:
                     x = x.cuda()
                     y = y.cuda()
