@@ -18,6 +18,77 @@ from torch.autograd import Variable
 import torch.utils.data as data
 
 
+
+
+class FilterVisualizer():
+    def __init__(self, model, size=64,
+                 upscaling_steps=10,
+                 upscaling_factor=1.2,
+                 blur=1,
+                 cuda=True):
+        self.size = size
+        self.upscaling_steps = upscaling_steps
+        self.upscaling_factor = upscaling_factor
+        self.model = model
+        self.cuda = cuda
+        if self.cuda:
+            self.model.cuda().eval()
+        self.blur=torchvision.transforms.GaussianBlur(blur)
+        for param in self.model.parameters():
+            param.requires_grad = False
+
+        self.transforms = [
+            torchvision.transforms.Resize(256),
+            torchvision.transforms.RandomCrop(224)
+        ]
+
+    def preprocess(self,x):
+        for t in self.transforms:
+            x = t(x)
+        return x
+    
+    def scaleup(self, img, sz):
+        tensor = torchvision.transforms.Resize((sz, sz))(img)
+        tensor = to_tensor(to_np(tensor), requires_grad=True, cuda=self.cuda)
+        return tensor
+    
+    def visualize(self, layer_name, filter, lr=0.01, opt_steps=20):
+        if self.cuda:
+            self.model.cuda().eval()
+        else:
+            self.model.eval()
+        sz = self.size
+        img = np.array(np.random.rand(sz, sz, 3), dtype=np.float32)
+        img_tens = to_tensor(change_axis_totensor(img), requires_grad=True, cuda=self.cuda)
+
+        for _ in range(self.upscaling_steps):
+            adam = torch.optim.Adam([img_tens], lr=lr, weight_decay=1e-6)
+            for n in range(opt_steps):
+                img_var = self.preprocess(img_tens)
+                adam.zero_grad()
+                activations = self.model.layer_activations(img_var, layer_name)[0]
+                loss = -torch.mean(activations[filter])
+                loss.backward()
+                adam.step()
+            sz = int(self.upscaling_factor * sz)
+            img_tens = self.scaleup(self.blur(img_tens), sz)
+
+        self.output = change_axis_tonp(to_np(img_tens))
+        self.plot()
+    
+    def plot(self):
+        plt.axis("off")
+        plt.imshow(self.output)
+
+
+def change_axis_tonp(array):
+    return np.moveaxis(array,0, 2)
+
+
+def change_axis_totensor(array):
+    return np.moveaxis(array, 2, 0)
+
+
 def train(
     model, data_loaders, optimizer, criterion, train_transform=None, num_epochs=1, log_every=100, cuda=True
 ):
