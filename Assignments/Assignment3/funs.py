@@ -19,6 +19,71 @@ import torch.utils.data as data
 
 
 
+class DeepDreamViz():
+    def __init__(self, model, size=64,
+                 upscaling_factor=1.2,
+                 blur=1,
+                 cuda=True):
+        self.size = size
+        self.upscaling_factor = upscaling_factor
+        self.model = model
+        self.cuda = cuda
+        self.blur=torchvision.transforms.GaussianBlur(blur)
+        self.transforms = [
+            torchvision.transforms.RandomCrop(224)
+        ]
+        
+    def load_image(self, path):
+        img = PIL.Image.open(path)
+        img = img.convert("RGB")
+        return np.asarray(img).astype("float32") / 255.0    
+    
+    def preprocess(self,x):
+        if x.shape[1] < 224:
+            x = torchvision.transforms.Resize((224,224))(x)
+        for t in self.transforms:
+            x = t(x)
+        return x
+
+    
+    def generate_imgs(self, img, upsc_img_num):
+        imgs = [img]
+        for _ in range(upsc_img_num - 1):
+            new_size = int(imgs[-1].shape[1]*self.upscaling_factor)
+            imgs.append(torchvision.transforms.Resize((new_size, new_size))(imgs[-1]))
+        return imgs
+        
+    def visualize(self, path, layer_name, filter, upsc_img_num, lr=0.01, opt_steps=20):
+        if self.cuda:
+            self.model.cuda().eval()
+        else:
+            self.model.eval()
+        img = self.load_image(path)
+        img = to_tensor(change_axis_totensor(img), cuda=self.cuda)
+        img = torchvision.transforms.Resize((self.size, self.size))(img)
+        imgs = self.generate_imgs(img, upsc_img_num)
+        
+        change = to_tensor(np.zeros_like(to_np(imgs[-1])), cuda=self.cuda)
+        for _, img_tens in enumerate(imgs[::-1]):
+            img_tens_cp = to_tensor(to_np(img_tens).copy(), cuda=self.cuda)
+            with torch.no_grad():
+                img_tens += torchvision.transforms.Resize((img_tens.shape[1:2]))(change)
+            img_tens.requires_grad = True
+            adam = torch.optim.Adam([img_tens], lr=lr, weight_decay=0)
+            for n in range(opt_steps):
+                adam.zero_grad()
+                img_trans = self.preprocess(img_tens).cuda()
+                activations = self.model.layer_activations(img_trans, layer_name)[0]
+                loss = -torch.mean(activations[filter])
+                loss.backward()
+                adam.step()
+                with torch.no_grad():
+                    torch.clip(self.blur(img_tens),0,1)
+            change = img_tens - img_tens_cp
+            assert np.any(to_np(change) != 0)
+                
+        return change_axis_tonp(to_np(img_tens))
+
 
 class FilterVisualizer():
     def __init__(self, model, size=64,
