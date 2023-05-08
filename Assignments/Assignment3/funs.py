@@ -550,11 +550,15 @@ class VGG(torch.nn.Module):
         """Return activations of all requested layers.
         """
         x = self.preprocess(x)
-        activations = []
+        layer_names_set=set(layer_names)
+        layer_activations_dict={}
         for name, layer in zip(self.feature_names, self.features):
             x = layer(x)
-            if name in layer_names:
-                activations.append(x)
+            if name in layer_names_set:
+                layer_activations_dict[name]=x
+        activations=[]
+        for name in layer_names:
+            activations.append(layer_activations_dict[name])
         return activations
 
     def predict(self, x, k=1):
