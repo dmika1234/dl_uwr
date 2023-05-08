@@ -19,42 +19,44 @@ import torch.utils.data as data
 
 
 class FGSM_Attack:
-    def __init__(self, model, epsilon):
+    def __init__(self, model, cuda=True):
         self.model = model
-        self.epsilon = epsilon
+        self.cuda = cuda
     
-    def generate(self, img, target_class, patch_loc=(0, 0), patch_size=(224, 224)):
+    def generate(self, img, target_class, epsilon=0.1, patch_loc=(0, 0), patch_size=(224, 224)):
         if self.cuda:
             self.model.cuda().eval()
         else:
             self.model.eval()
         # Convert the image to a tensor
-        img = torch.tensor(img).unsqueeze(0).permute(0, 3, 1, 2)
-        
-        # Create a tensor for the adversarial patch
-        patch = torch.zeros_like(img)
-        patch[:, :, patch_loc[0]:patch_loc[0] + patch_size[0], patch_loc[1]:patch_loc[1] + patch_size[1]] = 1
-        
-        # Calculate the gradient of the loss w.r.t. the input image
-        img.requires_grad = True
-        output = self.model(img)
-        loss = -output[0, target_class]
+        img = to_tensor(img, requires_grad=True, cuda=True)
+        patch_img = torch.zeros_like(img)
+        patch_img[patch_loc[0]:patch_loc[0]+patch_size[0]-1, patch_loc[0]:patch_loc[1]+patch_size[1]-1] = 1
+        # Get the model's output for the image
+        output = self.model(img.unsqueeze(0))
+
+        # Calculate the loss between the output and the target class
+        loss = F.cross_entropy(output, to_tensor(np.array([target_class]), cuda=True))
+
+        # Calculate gradients of the loss w.r.t. the image tensor
+        self.model.zero_grad()
         loss.backward()
-        
-        # Add the signed gradient of the loss w.r.t. the input image to the patch
-        patch_sign = patch.grad.sign()
-        patch = patch + self.epsilon * patch_sign
-        
-        # Clip the adversarial patch to the range [0, 1]
-        patch = torch.clamp(patch, 0, 1)
-        
-        # Apply the adversarial patch to the original image
-        img_adv = img + patch
-        img_adv = torch.clamp(img_adv, 0, 1)
-        
-        # Convert the adversarial image to a numpy array
-        img_adv = img_adv.squeeze().permute(1, 2, 0).detach().numpy()
-        return img_adv
+        gradient = img.grad.data
+
+        # Create adversarial image by adding a perturbation to the original image
+        perturbed_image = img + epsilon * gradient.sign() * patch_img
+
+        # Clip the pixel values of the adversarial image to the valid range [0,1]
+        perturbed_image = torch.clamp(perturbed_image, 0, 1)
+
+        # Convert the adversarial image back to a numpy array
+        self.perturbed_image_np = to_np(perturbed_image)
+        # self.plot()
+        return self.perturbed_image_np
+
+    def plot(self):
+        plt.axis("off")
+        plt.imshow(self.perturbed_image_np)
 
 
 
@@ -547,7 +549,13 @@ class VGG(torch.nn.Module):
     def multi_layer_activations(self, x, layer_names):
         """Return activations of all requested layers.
         """
-        pass # TODO implement me
+        x = self.preprocess(x)
+        activations = []
+        for name, layer in zip(self.feature_names, self.features):
+            x = layer(x)
+            if name in layer_names:
+                activations.append(x)
+        return activations
 
     def predict(self, x, k=1):
         """Return predicted class IDs.
